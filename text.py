@@ -79,3 +79,80 @@ def create_model(vocab_size, embedding_dim=100):
         tf.keras.layers.Dense(1, activation='sigmoid')
     ])
     return model
+
+def main():
+    try:
+        
+        print("Loading and preprocessing data...")
+        texts, labels = load_and_preprocess_data()
+        
+        
+        print("Vectorizing text...")
+        vectorizer = TextVectorization(
+            max_tokens=MAX_WORDS,
+            output_sequence_length=MAX_LEN,
+            standardize='lower_and_strip_punctuation'
+        )
+        
+        
+        print("Adapting vectorizer...")
+        vectorizer.adapt(texts)
+        
+        print("Converting texts to sequences...")
+       
+        padded_sequences = vectorizer(texts).numpy()
+        
+        # Split the data
+        indices = np.arange(len(texts))
+        np.random.shuffle(indices)
+        padded_sequences = padded_sequences[indices]
+        labels = labels[indices]
+        
+        
+        num_validation_samples = int(0.2 * len(texts))
+        x_train = padded_sequences[:-num_validation_samples]
+        y_train = labels[:-num_validation_samples]
+        x_val = padded_sequences[-num_validation_samples:]
+        y_val = labels[-num_validation_samples:]
+        
+        
+        print("Creating and compiling model...")
+        model = create_model(MAX_WORDS)
+        model.compile(
+            optimizer='adam',
+            loss='binary_crossentropy',
+            metrics=['accuracy']
+        )
+        
+        
+        print("Training model...")
+        history = model.fit(
+            x_train, y_train,
+            batch_size=BATCH_SIZE,
+            epochs=EPOCHS,
+            validation_data=(x_val, y_val)
+        )
+        
+       loss, accuracy = model.evaluate(x_val, y_val)
+        print(f"\nValidation accuracy: {accuracy:.4f}")
+        
+        
+        model.save('imdb_sentiment_model.keras')
+        
+        
+        def predict_sentiment(text):
+            sequences = vectorizer([text])
+            prediction = model.predict(sequences)[0][0]
+            return "Positive" if prediction > 0.5 else "Negative", prediction
+
+       
+        sample_text = "This movie was really great! I enjoyed every moment of it."
+        sentiment, confidence = predict_sentiment(sample_text)
+        print(f"\nSample text: {sample_text}")
+        print(f"Predicted sentiment: {sentiment} (confidence: {confidence:.4f})")
+        
+    except Exception as e:
+        print(f"An error occurred: {e}")
+
+if __name__ == "__main__":
+    main()
